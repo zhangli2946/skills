@@ -1,0 +1,18 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Container_Boundary("datalake","Data Lake Service Domain"){
+    Container("realtime","Realtime Service","Stateful Application","EdgeSide Access Point")
+    Container("archive", "Archive Service", "Stateful Application", "TimeSeries Storage Writer")
+    Container("config", "Config Service", "Stateless Application", "Model Storage Writer")
+    ContainerDb("mariadb", "Model Storage","Mariadb", "Relation Storage Provider")
+    Rel_L("archive","config","Domain Model Records", "HTTP","Model Properties Queries")
+}
+
+ContainerQueue("kafka", "Message Broker","Kafka Broker", "")
+BiRel("kafka" , "realtime","Domain Messages","ProtoBuffer", "EdgeSide Events Notification")
+Rel("kafka", "config", "Domain Messages", "ProtoBuffer","Model Change Events Notification")
+Rel("kafka", "archive", "Domain Messages", "ProtoBuffer","Value Change Events Notification")
+BiRel("config", "mariadb", "Domain Model Records", "SQL", "Model Maintains Operation")
+
+@enduml

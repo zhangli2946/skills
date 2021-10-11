@@ -1,0 +1,46 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+LAYOUT_LANDSCAPE()
+'LAYOUT_LEFT_RIGHT()
+
+Enterprise_Boundary(supos, "SupOS Service Cluster",){
+
+    System_Boundary(lake, "Data Lake Domain"){
+        System(ingress, "PlatformSide Data Ingress System","Models & Values Events Notifier")
+        SystemDb(persist, "PlatformSide Data Storage System","Models & Values Storage Provider")
+        Rel(ingress, persist, "notifies meta & value events to", "via Kafka")
+    }
+
+    System_Boundary(warehouse, "Data Warehouse Domain"){
+        System(modeling , "Data Modeling System","Modeling Operations Provider")
+        System(computing , "Streaming System", "Computing Tasks Executor")
+    }
+
+    System_Boundary(business, "Business Intelligence Domain"){
+        System_Ext(app, "Business Intelligence Applications", "Third-Part or Builtin Applications for business purpose")
+        SystemDb_Ext(persist_ext, "ApplicationSide Data Storage System","UDF durable storage provider")
+        Rel(app, persist_ext, "manipulates records against", "via JDBC")
+    }
+
+    Rel(app, persist, "manipulate records against", "via JDBC")
+    Rel(computing, persist,"notifies value events to", "via Kafka")
+    Rel(ingress, computing, "notifies value events to", "via Kafka")
+    Rel(ingress, modeling, "notifies meta events to", "via Kafka")
+    Rel(app, modeling, "manipulates models against", "via HTTP etc.")
+    Rel(computing, app, "sends value events to ", "via WS etc.")
+    Rel(modeling, computing, "feeds computing tasks to", "via HTTP")
+    Rel(computing, modeling, "fetches meta records from", "via HTTP")
+}
+
+
+System_Boundary(external, "External Users & Services Cluster"){
+    Person_Ext(user, "External User","")
+    System_Ext(third, "EdgeSide Collector System", "EdgeSide System for Reporting Models & Events")
+    Rel(user, third, "maintains against", "via HTTP etc.")
+}
+Rel(third, ingress, "reports real-world events to","TCP / UDP / gRPC / MQTT etc.")
+Rel(user, modeling, "maintains & views against", "via HTTP etc.")
+Rel(user, app, "maintains & uses against", "via HTTP etc.")
+@enduml
