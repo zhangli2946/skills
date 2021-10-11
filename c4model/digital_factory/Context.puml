@@ -24,7 +24,7 @@ Enterprise_Boundary(supos, "SupOS Service Cluster",){
         Rel(app, persist_ext, "manipulates records against", "via JDBC")
     }
 
-    Rel(app, persist, "manipulate records against", "via JDBC")
+    Rel(app, persist, "manipulates records against", "via JDBC")
     Rel(computing, persist,"notifies value events to", "via Kafka")
     Rel(ingress, computing, "notifies value events to", "via Kafka")
     Rel(ingress, modeling, "notifies meta events to", "via Kafka")
@@ -40,7 +40,7 @@ System_Boundary(external, "External Users & Services Cluster"){
     System_Ext(third, "EdgeSide Collector System", "EdgeSide System for Reporting Models & Events")
     Rel(user, third, "maintains against", "via HTTP etc.")
 }
-Rel(third, ingress, "reports real-world events to","TCP / UDP / gRPC / MQTT etc.")
+Rel(third, ingress, "reports real-world events to","via TCP / UDP / gRPC / MQTT etc.")
 Rel(user, modeling, "maintains & views against", "via HTTP etc.")
 Rel(user, app, "maintains & uses against", "via HTTP etc.")
 @enduml
