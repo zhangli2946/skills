@@ -1,0 +1,56 @@
+@startuml
+!include <C4/C4_Component>
+!include <C4/C4_Container>
+
+AddRelTag("data", $lineColor="lightgreen", $textColor="green")
+AddRelTag("control", $lineColor="blue", $textColor="darkblue")
+
+Boundary(all, "计算任务架构图", "view"){
+    Boundary(cloud, "平台侧", "cloud side"){
+        Container(rtc, "Sandbox Provider", "wasm/docker/k8s", "计算任务的执行环境")
+        Container(graph, "计算任务管理模块", "")
+        Container(csopr, "沙箱调度模块", "Master", "")
+        SystemQueue_Ext(broker, "Broker Provider", "低延迟的消息订阅发布设施")
+        SystemDb_Ext(other, "Backend Provider", "平台侧提供的其他后端服务")
+        System(rtc, "Sandbox Provider", "计算任务的执行环境")
+        System(depot, "Repository Provider", "计算任务可执行文件的归档")
+
+        Boundary(css, "vms"){
+            Component(cstep1, "数据捕获", "actor", "")
+            Component(cstep2, "数据处理", "actor", "")
+            Component(cstep3, "后端刷新", "actor", "")
+            BiRel_D(cstep1, broker, " 消费/发布计算结果", $tags="data")
+            BiRel_D(cstep2, broker, " 消费/发布计算结果", $tags="data")
+            BiRel_D(cstep3, broker, " 消费/发布计算结果", $tags="data")
+            BiRel(cstep3, other, " 计算结果写入 快照/存储")
+        }
+        System_Ext(csource, "数据流来源", "")
+        BiRel_L(csource, cstep1, " 数据推送/定时轮询  等")
+        BiRel_D(rtc, css, " 算图管理与订阅控制", $tags="control")
+        BiRel_L(rtc, depot, " 获取计算过程可执行文件", $tags="control")
+        Rel_D(csopr, depot, " 发布计算过程可执行文件", $tags="control")
+        Rel_D(csopr, rtc, " 发布计算任务编排", $tags="control")
+        Rel_D(graph, csopr, " 发布算图", $tags="control")
+    }
+    Boundary(edge, "边缘侧", "edge side"){
+        Container(esopr, "沙箱调度模块", "Slave", "")
+        System_Ext(rte, "Sandbox Provider", "计算任务的执行环境")
+
+        Boundary(ess, "vms"){
+            Component(estep1, "数据捕获", "actor", "")
+            Component(estep2, "数据处理", "actor", "边缘侧编排\n转移至边缘侧")
+            BiRel_D(estep1, broker, " 消费/发布计算结果", $tags="data")
+            BiRel_D(estep2, broker, " 消费/发布计算结果", $tags="data")
+        }
+        System_Ext(esource, "数据来源", "")
+        BiRel_U(esource, estep1, " 数据推送/定时轮询  等")
+        BiRel_D(esopr, rte, " 发布计算任务编排", $tags="control")
+        BiRel_D(rte, ess, " 算图管理与订阅控制", $tags="control")
+        BiRel_R(rte, depot, " 获取计算过程可执行文件", $tags="control")
+        Rel_D(graph, esopr, " 发布算图", $tags="control")
+    }
+    BiRel_L(esopr, csopr, "算图协调")
+    Lay_L(rtc, depot)
+    Lay_L(depot, rte)
+}
+@enduml
