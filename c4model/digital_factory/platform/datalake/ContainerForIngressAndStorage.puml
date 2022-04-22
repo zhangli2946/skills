@@ -1,39 +1,39 @@
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+'!include <C4/C4_Container>
 
 LAYOUT_LANDSCAPE()
-Container_Ext(collector, "Collector", "Process")
+Container_Ext(collector, "Edge", "Process")
 
-System_Boundary(lake, "Data Lake Domain"){
+Boundary(lake, "Data Lake Domain", "Cloud"){
 
-    ContainerQueue_Ext(kafka, "Message Broker", "kafka", "")
-    Boundary(ingress, "Data Ingress System","Sub-System"){
-        Container(config, "Config Service", "API", "")
-        Rel(kafka, config, "publishes meta events to","via Kafka","")
+    ContainerQueue_Ext(kafka, "Kafka", "kafka", "")
+    Boundary(ingress, "Data Ingress System", "Sub-System"){
+        Container(config, "MetaStore", "API", "")
+        Rel(kafka, config, "publishes meta events to", "via Kafka", "")
 
-        Container(realtime, "Realtime Service", "Gateway", "Events Ingress Endpoint")
-        Rel(collector, realtime, "reports real-world events to","via TCP / UDP / gRPC / MQTT etc.")
+        Container(realtime, "Ingress", "Gateway", "Events Ingress Endpoint")
+        Rel(collector, realtime, "reports real-world events to", "via TCP / UDP / gRPC / MQTT etc.")
         Rel(realtime, kafka, "publishes meta & value events to", "via Kafka")
         Rel(realtime, config, "requests quota events from", "via Kafka")
     }
 
-    Boundary(persist, "Data Storage System","Sub-System"){
-        ContainerDb(mariadb, "Storage Provider", "Mariadb", "")
-        Rel(config, mariadb,"manipulates model records against","via JDBC")
+    Boundary(persist, "Data Storage System", "Sub-System"){
+        ContainerDb(mariadb, "Storage", "Mariadb", "")
+        Rel(config, mariadb,"manipulates model records against", "via JDBC")
 
-        ContainerDb(mongo, "Storage Provider", "Mongodb", "")
-        ContainerDb(influx, "Storage Provider", "Influxdb", "")
+        ContainerDb(mongodb, "Storage", "Mongodb", "")
+        ContainerDb(influx, "Storage", "Influxdb", "")
         Lay_R(mariadb, influx)
 
-        Container(archive_t, "Connector","TimeSeries","")
-        Rel(archive_t, influx, "reads & writes records from ","via HTTP")
-        Rel(kafka, archive_t, "notifies value events to","via Kafka")
-        Rel(archive_t, config, "reads model records from ","via HTTP")
+        Container(archive_t, "SinkConnector", "TimeSeries", "")
+        Rel(archive_t, influx, "reads & writes records from ", "via HTTP")
+        Rel(kafka, archive_t, "notifies value events to", "via Kafka")
+        Rel(archive_t, config, "reads model records from ", "via HTTP")
 
-        Container(archive_n, "Connector","NoSQL","")
-        Rel(archive_n, mongo, "reads & writes records from ","via HTTP")
-        Rel(kafka, archive_n, "notifies value events to","via Kafka")
+        Container(archive_n, "SinkConnector", "NoSQL", "")
+        Rel(archive_n, mongodb, "reads & writes records from ", "via HTTP")
+        Rel(kafka, archive_n, "notifies value events to", "via Kafka")
     }
 }
-
 @enduml
