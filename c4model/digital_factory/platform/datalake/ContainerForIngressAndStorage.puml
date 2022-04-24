@@ -3,37 +3,42 @@
 '!include <C4/C4_Container>
 
 LAYOUT_LANDSCAPE()
-Container_Ext(collector, "Edge", "Process")
-
-Boundary(lake, "Data Lake Domain", "Cloud"){
-
-    ContainerQueue_Ext(kafka, "Kafka", "kafka", "")
-    Boundary(ingress, "Data Ingress System", "Sub-System"){
-        Container(config, "MetaStore", "API", "")
-        Rel(kafka, config, "publishes meta events to", "via Kafka", "")
-
-        Container(realtime, "Ingress", "Gateway", "Events Ingress Endpoint")
-        Rel(collector, realtime, "reports real-world events to", "via TCP / UDP / gRPC / MQTT etc.")
-        Rel(realtime, kafka, "publishes meta & value events to", "via Kafka")
-        Rel(realtime, config, "requests quota events from", "via Kafka")
+Container_Ext(iot, "IoT Gateway", "Third-Part")
+ContainerDb_Ext(extdb_t, "ExternalDatabase", "TimeSeries")
+Boundary(all, "SupOS Domain", "unified"){
+    Container_Ext(collector, "supCollector", "Process")
+    ContainerQueue_Ext(kafka, "Message Broker", "kafka")
+    Boundary(lake, "Data Lake Domain", "System"){
+        Boundary(ingress, "Data Ingress System", "Sub-System"){
+            Container(proxy_t, "Database Ingress", "TimeSeries", "")
+            Container(realtime, "Real-Time Ingress", "Gateway", "Events Ingress Endpoint")
+            ContainerQueue_Ext(emq, "MQTT Broker", "emq")
+            Rel(collector, realtime, "reports real-world events to", "via TCP / UDP / gRPC etc.")
+            Rel(emq, realtime, "notifies real-world events to", "via MQTT")
+            Rel(extdb_t, proxy_t, "push meta & value records to", "via HTTP etc.")
+            Rel(iot, emq, "reports real-world events to", "via MQTT")
+            Rel(proxy_t, kafka, "publishes meta & value events to", "via Kafka")
+            Rel(realtime, kafka, "publishes meta & value events to", "via Kafka")
+        }
+        Boundary(persist, "Data Storage System", "Sub-System"){
+            Container(archive_n, "Sink Connector", "NoSQL", "")
+            Container(config, "Sink Connector", "Metadata", "")
+            Container(archive_t, "Sink Connector", "TimeSeries", "")
+            ContainerDb(influx, "Storage Provider", "Influxdb", "")
+            ContainerDb(mariadb, "Storage Provider", "Mariadb", "")
+            ContainerDb(mongodb, "Storage Provider", "Mongodb", "")
+            Rel(archive_n, mongodb, "reads & writes records from ", "via HTTP")
+            Rel_D(archive_t, config, "reads meta records from ", "via HTTP")
+            Rel(archive_t, influx, "reads & writes records from ", "via HTTP")
+            Rel(config, mariadb, "manipulates meta records against", "via JDBC")
+            Rel(kafka, persist, "notifies meta & value events to", "via Kafka")
+            Rel(realtime, config, "requests quota events from", "via Kafka")
+        }
     }
-
-    Boundary(persist, "Data Storage System", "Sub-System"){
-        ContainerDb(mariadb, "Storage", "Mariadb", "")
-        Rel(config, mariadb,"manipulates model records against", "via JDBC")
-
-        ContainerDb(mongodb, "Storage", "Mongodb", "")
-        ContainerDb(influx, "Storage", "Influxdb", "")
-        Lay_R(mariadb, influx)
-
-        Container(archive_t, "SinkConnector", "TimeSeries", "")
-        Rel(archive_t, influx, "reads & writes records from ", "via HTTP")
-        Rel(kafka, archive_t, "notifies value events to", "via Kafka")
-        Rel(archive_t, config, "reads model records from ", "via HTTP")
-
-        Container(archive_n, "SinkConnector", "NoSQL", "")
-        Rel(archive_n, mongodb, "reads & writes records from ", "via HTTP")
-        Rel(kafka, archive_n, "notifies value events to", "via Kafka")
-    }
+    Container_Ext(oodm, "Modeling System", "System")
+    Container_Ext(flink, "Streaming System", "System")
+    BiRel(flink, kafka, "publishes value events to && notifies value events to", "via Kafka")
+    Rel_L(oodm, kafka, "publishes meta events to", "via Kafka")
+    Rel(oodm, persist, "reads value records from ", "via HTTP")
 }
 @enduml

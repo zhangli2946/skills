@@ -1,0 +1,83 @@
+@startuml
+
+box "Infra domain" #LightBlue
+    queue Kafka as K order 2
+end box
+
+box "Lake domain" #lightGray
+    boundary Realtime as R order 11
+    control Archive as A order 9
+    database Influxdb as I order 10
+    entity Config as C order 8
+    database Redis as D order 8
+end box
+
+group 实时流入库 [边缘侧]
+    A -> K : 拉取 实时值流变化事件 && 提交 消费进度
+    return data
+    note over A
+        Kafka Response :
+        \t topic : rtd_value_event
+        \t schema : rtdproto.NamedValueSequence
+        \t style : Batch (1 <= len < KafkaPkgLimit)
+    end note
+    alt 元数据缺失
+        A -> C : 补全元数据
+        alt 补全失败
+            C --> A : 元数据 ×
+            note over A
+                当补全失败时:
+                \t终止该实时值的处理流程
+            end note
+        else 补全成功
+            C --> A : 元数据 √
+            note over A
+                HTTP Request :
+                \t url : /config/api/v1/tags/xlist
+                \t schema : fetcher.State
+                \t size : Batch 预热 / Single 补缺
+            end note
+        end
+    else 元数据完整
+        A -> I : 累积批量 写入存储
+        return 接收确认
+    end alt
+else 计算引擎侧
+    A -> K : 拉取 实时值流变化事件 && 提交 消费进度
+    return data
+    note over A
+        Kafka Response :
+        \t topic : inner_value_event
+        \t schema : rtdproto.NamedValueSequence
+        \t style : Batch (1 = len)
+    end note
+    ... (省略) 元数据补全 ...
+    A -> I : 累积批量 写入存储
+    return 接收确认
+else 外挂库侧
+    A -> K : 拉取 实时值流变化事件 && 提交 消费进度
+    return data
+    note over A
+        Kafka Response :
+        \t topic : inner_value_event
+        \t schema : rtdproto.NamedValueSequence
+        \t style : Batch (1 <= len < KafkaPkgLimit)
+    end note
+    ... (省略) 元数据补全 ...
+    A -> I : 累积批量 写入存储
+    return 接收确认
+end group
+
+group 实时流快照
+    R -> K : 拉取 实时值流变化事件 && 提交 消费进度
+    return data
+    note over R
+        Kafka Response :
+        \t topic : rtd_value_event
+        \t schema : rtdproto.NamedValueSequence
+        \t style : Batch (1 <= len < KafkaPkgLimit)
+    end note
+    R -> D : 写入缓存
+    return ack
+end group
+@enduml

@@ -1,0 +1,77 @@
+@startuml
+
+box "Infra domain" #LightBlue
+    queue Kafka as K order 11
+end box
+
+box "Edge domain" #LightGreen
+    control Collector as E order 1
+end box
+
+box "Lake domain" #lightGray
+    boundary Realtime as R order 2
+    queue EMQ as Q order 3
+    entity Config as C order 12
+end box
+
+group 边缘侧元数据报送 [全量]
+    group 多次报送 (不同协议) [UDP]
+        E --> R : 发送 快照值
+        note over R
+            以 UDP 通讯协议接入的采集器
+            没有元数据申报过程
+            元数据刷新
+        end note
+        group 元数据变更通知 [action = refresh]
+            R -> K : 发送 元数据变化事件
+            return ack
+            C -> K : 拉取 元数据变化事件 && 提交 消费进度
+            return 元数据变化事件
+            note over C
+                Kafka Response :
+                \t topic : rtd_meta_event
+                \t header : action => $action
+                \t schema : rtdproto.MetaTagSequence
+                \t style : Batch (1 <= len < KafkaPkgLimit)
+            end note
+        end group
+    else TCP/gRPC
+        E -> R : 发送 元数据变化事件
+        return ack
+        ... (省略) 元数据变更通知 [action = refresh] ...
+    else MQTT
+        E -> Q : 发送 元数据变化事件
+        return ack
+        Q -> R : 消费 元数据变化事件
+        return ack
+        ... (省略) 元数据变更通知 [action = refresh]...
+    end group
+else 增量
+    group 多次报送 (TCP/gRPC only) [ADD]
+        E -> R : 发送 元数据变化事件
+        return ack
+        group 元数据变更通知 [action = add]
+           R -> K : 发送 元数据变化事件
+           return ack
+           C -> K : 拉取 元数据变化事件 && 提交 消费进度
+           return 元数据变化事件
+           note over C
+               Kafka Response :
+               \t topic : rtd_meta_event
+               \t header : action => $action
+               \t schema : rtdproto.MetaTagSequence
+               \t style : Batch (1 <= len < KafkaPkgLimit)
+           end note
+       end group
+    else DEL
+        E -> R : 发送 元数据变化事件
+        return ack
+        ... (省略) 元数据变更通知 [action = del]...
+    else MOD
+        E -> R : 发送 元数据变化事件
+        return ack
+        ... (省略) 元数据变更通知 [action = mod]...
+    end group
+end group
+
+@enduml

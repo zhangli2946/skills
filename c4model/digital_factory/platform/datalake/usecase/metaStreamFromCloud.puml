@@ -1,0 +1,58 @@
+@startuml
+
+box "Upper domain" #LightGreen
+    control Oodm as O order 1
+end box
+
+box "Infra domain" #LightBlue
+    queue Kafka as K order 3
+end box
+
+box "Lake domain" #lightGray
+    control ExtSvc as E order 2
+    entity Config as C order 8
+end box
+
+group 元数据报送 [外挂库侧]
+   group 元数据变更通知 [action = add|del]
+       E -> K : 发送 元数据变化事件
+       return ack
+       C -> K : 拉取 元数据变化事件 && 提交 消费进度
+       return 元数据变化事件
+       note over C
+           Kafka Response :
+           \t topic : inner_meta_event
+           \t header : action => $action
+           \t schema : rtdproto.MetaTag
+           \t style : Single (1 = len)
+       end note
+   end group
+else 建模侧
+    group 元数据变更通知 [action = add]
+        O -> K : 发送 元数据变化事件
+        return ack
+        C -> K : 拉取 元数据变化事件 && 提交 消费进度
+        return 元数据变化事件
+        note over C
+            Kafka Response :
+            \t topic : inner_meta_event
+            \t header : action => $action
+            \t schema : rtdproto.MetaTag
+            \t style : Single (1 = len)
+        end note
+    else del|unbindObject|unbindProps|partial*
+        O -> K : 发送 元数据变化事件
+        return ack
+        C -> K : 拉取 元数据变化事件 && 提交 消费进度
+        return 元数据变化事件
+        note over C
+            Kafka Response :
+            \t topic : inner_meta_event
+            \t header : action => $action
+            \t schema : rtdproto.MetaTagSequence
+            \t style : Batch (1 <= len < KafkaPkgLimit)
+        end note
+    end group
+end group
+
+@enduml
