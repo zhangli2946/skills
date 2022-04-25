@@ -6,10 +6,10 @@ end box
 
 box "Lake domain" #lightGray
     boundary Realtime as R order 11
-    control Archive as A order 9
-    database Influxdb as I order 10
+    control Archive as A order 10
+    database Influxdb as I order 9
     entity Config as C order 8
-    database Redis as D order 8
+    database Redis as D order 10
 end box
 
 group 实时流入库 [边缘侧]
@@ -73,9 +73,9 @@ group 实时流快照
     return data
     note over R
         Kafka Response :
-        \t topic : rtd_value_event
+        \t topic : inner_value_event
         \t schema : rtdproto.NamedValueSequence
-        \t style : Batch (1 <= len < KafkaPkgLimit)
+        \t style : BatchMixed
     end note
     R -> D : 写入缓存
     return ack
