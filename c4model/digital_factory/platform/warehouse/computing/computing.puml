@@ -1,0 +1,104 @@
+@startuml
+'class Header {
+'    {field} + Key : string
+'    {field} + Value : []byte
+'}
+'abstract Record {
+'    {method} + MarshalBinary() ([]byte, error)
+'    {method} + Metadata() ([]Header)
+'    {method} + Object() ([]byte)
+'}
+'abstract Expression {}
+'abstract ExpressionModifier {}
+'abstract Argument {
+'    {method} + Name() string
+'    {method} + EventTime() int64
+'    {method} + ProcessTime() int64
+'    {method} + ObserveTime() int64
+'    {method} + Value() interface{}
+'    {method} + MarshalBinary() ([]byte, error)
+'}
+
+interface Consumer {
+    {method} + Subscribe(...string) error
+    {method} + Close() error
+}
+abstract ExpressionConsumer {
+    {method} + Expressions() chan ExpressionModifier
+}
+abstract ArgumentsConsumer{
+    {method} + Arguments() chan Argument
+}
+class State {
+    {field} + name : string
+    {field} + indicator : uint
+    {field} + times : []time.Time
+    {field} - \t : *sync.RWMutex
+    {method} + Update(Argument) error
+    {method} + GetVal() Argument
+}
+class StateManager {
+    {field} - shared : map[string]State
+    {method} + GetOrNewRef(string) (*State, bool)
+}
+class Status {
+     {field}  - cache : []*State
+     {method} + Register(*State)
+     {method} + UnRegister(*State)
+ }
+abstract Producer {
+    {method} + Produce(context.Context, Record) error
+}
+abstract Computation {
+    {method} + Compute(context.Context) error
+}
+interface TimeTrigger{
+    {method} + OnTime(time.Time) bool
+}
+interface EventTrigger{
+    {method} + OnEvent(...Record) error
+}
+class ComputationGroup {
+    {field}  - computations : []Computation
+    {field}  - local : Status
+    {method} + Compute(context.Context) error
+    {method} + OnEvent(...Record) error
+    {method} + OnTime(time.Time) bool
+}
+interface Operator {
+    {method} + Configure(context.Context, ...ExpressionModifier) (int, error)
+}
+interface Dispatcher {
+    {method} + Dispatch(context.Context, ...Argument) (int, error)
+}
+class Router {
+    {field} - routes : map[string]ComputationGroup
+    {field}  - produce : Producer
+    {method} + Dispatch(context.Context, ...Argument) (int, error)
+    {method} + Configure(context.Context, ...ExpressionModifier) (int, error)
+    {method} + Serve(context.Context, ...RouteBuilderOptionModifier) error
+}
+
+class Runner {
+    {method} + Run(context.Context, *Router, Dispatcher) error
+    {method} + Run(context.Context, *Router, Operator) error
+}
+
+ComputationGroup    ..|> Computation
+Consumer            <|.. ArgumentsConsumer
+Consumer            <|.. ExpressionConsumer
+Dispatcher          <|.. Router
+EventTrigger    <|.. ComputationGroup
+Operator            <|.. Router
+TimeTrigger     <|.. ComputationGroup
+Computation         --* ComputationGroup
+ComputationGroup    *-- Status
+Status              *-- State
+Producer            --o Router
+StateManager        o-- State
+ArgumentsConsumer   <-- Runner
+ComputationGroup    <-- Router
+Dispatcher          <-- Runner
+ExpressionConsumer  <-- Runner
+Operator            <-- Runner
+@enduml
